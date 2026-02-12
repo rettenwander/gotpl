@@ -27,11 +27,12 @@ import (
 	"strings"
 )
 
-// PageData is a convenience wrapper for passing a page title and
-// arbitrary data to a template.
+// PageData is a convenience wrapper for passing a page title,
+// arbitrary data, and an optional form to a template.
 type PageData struct {
 	Title string
 	Data  any
+	Form  *Form
 }
 
 // Template holds parsed HTML templates organized by layout and view.
