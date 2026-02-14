@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"net/http"
 	"path"
 	"path/filepath"
 	"strings"
@@ -122,4 +123,27 @@ func (t *Template) Validate() error {
 	t.views = views
 
 	return nil
+}
+
+// FormFromRequest creates a [Form] pre-populated with all POST body values
+// from the given request, taking the first value for each field.
+// If a CSRF generator was configured via [WithCSRF], the token is set on the form.
+func (t *Template) FormFromRequest(r *http.Request) (*Form, error) {
+	if err := r.ParseForm(); err != nil {
+		return nil, err
+	}
+
+	csrf := ""
+	if t.config.csrfTokenGenerator != nil {
+		csrf = t.config.csrfTokenGenerator(r)
+	}
+
+	form := NewForm(t.config.csrfFieldName, csrf)
+	for field, values := range r.PostForm {
+		if len(values) > 0 {
+			form.Values[field] = values[0]
+		}
+	}
+
+	return form, nil
 }

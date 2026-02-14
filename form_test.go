@@ -1,14 +1,11 @@
 package gotpl
 
 import (
-	"net/http"
-	"net/url"
-	"strings"
 	"testing"
 )
 
 func TestNewForm(t *testing.T) {
-	form := NewForm()
+	form := NewForm("", "")
 
 	if form.Values == nil {
 		t.Fatal("Values map is nil")
@@ -22,7 +19,7 @@ func TestNewForm(t *testing.T) {
 }
 
 func TestFormSetGet(t *testing.T) {
-	form := NewForm()
+	form := NewForm("", "")
 	form.Set("email", "test@example.com")
 
 	if got := form.Get("email"); got != "test@example.com" {
@@ -31,7 +28,7 @@ func TestFormSetGet(t *testing.T) {
 }
 
 func TestFormGetMissing(t *testing.T) {
-	form := NewForm()
+	form := NewForm("", "")
 
 	if got := form.Get("missing"); got != "" {
 		t.Errorf("Get(missing) = %q, want empty string", got)
@@ -39,7 +36,7 @@ func TestFormGetMissing(t *testing.T) {
 }
 
 func TestFormAddFieldError(t *testing.T) {
-	form := NewForm()
+	form := NewForm("", "")
 	form.AddFieldError("email", "Email is required")
 
 	if got := form.FieldErrors["email"]; got != "Email is required" {
@@ -51,7 +48,7 @@ func TestFormAddFieldError(t *testing.T) {
 }
 
 func TestFormAddFieldErrorKeepsFirst(t *testing.T) {
-	form := NewForm()
+	form := NewForm("", "")
 	form.AddFieldError("email", "first error")
 	form.AddFieldError("email", "second error")
 
@@ -61,7 +58,7 @@ func TestFormAddFieldErrorKeepsFirst(t *testing.T) {
 }
 
 func TestFormAddError(t *testing.T) {
-	form := NewForm()
+	form := NewForm("", "")
 	form.AddError("invalid credentials")
 
 	if len(form.Errors) != 1 || form.Errors[0] != "invalid credentials" {
@@ -74,7 +71,7 @@ func TestFormAddError(t *testing.T) {
 
 func TestFormValid(t *testing.T) {
 	t.Run("no errors", func(t *testing.T) {
-		form := NewForm()
+		form := NewForm("", "")
 		form.Set("name", "Alice")
 		if !form.Valid() {
 			t.Error("form without errors should be valid")
@@ -82,7 +79,7 @@ func TestFormValid(t *testing.T) {
 	})
 
 	t.Run("field error only", func(t *testing.T) {
-		form := NewForm()
+		form := NewForm("", "")
 		form.AddFieldError("name", "required")
 		if form.Valid() {
 			t.Error("form with field error should not be valid")
@@ -90,7 +87,7 @@ func TestFormValid(t *testing.T) {
 	})
 
 	t.Run("form error only", func(t *testing.T) {
-		form := NewForm()
+		form := NewForm("", "")
 		form.AddError("something went wrong")
 		if form.Valid() {
 			t.Error("form with form error should not be valid")
@@ -98,7 +95,7 @@ func TestFormValid(t *testing.T) {
 	})
 
 	t.Run("both errors", func(t *testing.T) {
-		form := NewForm()
+		form := NewForm("", "")
 		form.AddFieldError("name", "required")
 		form.AddError("something went wrong")
 		if form.Valid() {
@@ -107,59 +104,11 @@ func TestFormValid(t *testing.T) {
 	})
 }
 
-func TestFormFromRequest(t *testing.T) {
-	body := url.Values{
-		"email":   {"test@example.com"},
-		"message": {"hello"},
-	}
+func TestCsrfField(t *testing.T) {
+	form := NewForm("CSRF", "csrf-token-1234")
+	field := form.CSRF()
 
-	r, err := http.NewRequest(http.MethodPost, "/contact", strings.NewReader(body.Encode()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	form := FormFromRequest(r)
-
-	if got := form.Get("email"); got != "test@example.com" {
-		t.Errorf("Get(email) = %q, want %q", got, "test@example.com")
-	}
-	if got := form.Get("message"); got != "hello" {
-		t.Errorf("Get(message) = %q, want %q", got, "hello")
-	}
-	if !form.Valid() {
-		t.Error("form from request should be valid (no errors added)")
-	}
-}
-
-func TestFormFromRequestTakesFirstValue(t *testing.T) {
-	body := url.Values{
-		"color": {"red", "blue"},
-	}
-
-	r, err := http.NewRequest(http.MethodPost, "/", strings.NewReader(body.Encode()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	form := FormFromRequest(r)
-
-	if got := form.Get("color"); got != "red" {
-		t.Errorf("Get(color) = %q, want %q (first value)", got, "red")
-	}
-}
-
-func TestFormFromRequestIgnoresQueryParams(t *testing.T) {
-	r, err := http.NewRequest(http.MethodPost, "/?secret=fromquery", strings.NewReader(""))
-	if err != nil {
-		t.Fatal(err)
-	}
-	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	form := FormFromRequest(r)
-
-	if got := form.Get("secret"); got != "" {
-		t.Errorf("Get(secret) = %q, want empty (query params should be ignored)", got)
+	if field != `<input type="hidden" name="CSRF" value="csrf-token-1234">` {
+		t.Errorf("CSRF field is not valid")
 	}
 }

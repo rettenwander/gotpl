@@ -1,6 +1,9 @@
 package gotpl
 
-import "net/http"
+import (
+	"html"
+	"html/template"
+)
 
 // Form holds submitted field values and validation errors for template rendering.
 //
@@ -17,7 +20,12 @@ import "net/http"
 //	    tmpl.Render(w, "layout/contact.html", gotpl.PageData{Form: form})
 //	    return
 //	}
+//
+
 type Form struct {
+	csrfToken     string
+	csrfFieldName string
+
 	// Values holds the raw string values keyed by field name.
 	Values map[string]string
 
@@ -31,25 +39,14 @@ type Form struct {
 }
 
 // NewForm returns an empty [Form] ready for use.
-func NewForm() *Form {
+func NewForm(csrfName, csrf string) *Form {
 	return &Form{
+		csrfFieldName: csrfName,
+		csrfToken:     csrf,
+
 		Values:      make(map[string]string),
 		FieldErrors: make(map[string]string),
 	}
-}
-
-// FormFromRequest creates a [Form] pre-populated with all POST body values
-// from the given request. It takes the first value for each field.
-func FormFromRequest(r *http.Request) *Form {
-	r.ParseForm()
-
-	form := NewForm()
-	for field, values := range r.PostForm {
-		if len(values) > 0 {
-			form.Values[field] = values[0]
-		}
-	}
-	return form
 }
 
 // Set stores a field value.
@@ -78,4 +75,10 @@ func (f *Form) AddError(message string) {
 // Valid reports whether the form has no errors of any kind.
 func (f *Form) Valid() bool {
 	return len(f.FieldErrors) == 0 && len(f.Errors) == 0
+}
+
+// CSRFField returns a hidden HTML input element containing the CSRF token.
+// Use it in templates: {{.Form.CSRF}}
+func (f *Form) CSRF() template.HTML {
+	return template.HTML(`<input type="hidden" name="` + html.EscapeString(f.csrfFieldName) + `" value="` + html.EscapeString(f.csrfToken) + `">`)
 }
